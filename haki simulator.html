@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HAKI Monitor — Hardware-Agnostic Kinetic Integrity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ── Design Tokens ─────────────────────────────────────────── */
+:root{
+  --bg:         #07080d;
+  --bg-panel:   #0c0e17;
+  --bg-card:    #11131f;
+  --bg-hover:   #181b2a;
+  --border:     #1e2235;
+  --border-hi:  #2c3154;
+
+  --tx:         #dde2f2;
+  --tx-2:       #7d84a6;
+  --tx-3:       #3d4260;
+
+  --green:      #1fc76a;
+  --green-bg:   rgba(31,199,106,.12);
+  --amber:      #f5a623;
+  --amber-bg:   rgba(245,166,35,.12);
+  --red:        #f04b4b;
+  --red-bg:     rgba(240,75,75,.12);
+  --yellow:     #f0c040;
+  --yellow-bg:  rgba(240,192,64,.12);
+  --blue:       #3b8ef5;
+  --blue-bg:    rgba(59,142,245,.12);
+  --purple:     #a166f5;
+  --purple-bg:  rgba(161,102,245,.12);
+
+  --mono:    'JetBrains Mono',monospace;
+  --display: 'Syne',sans-serif;
+  --r:       6px;
+  --r-lg:    10px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--mono);font-size:12.5px;line-height:1.5;overflow:hidden;}
+
+/* ── Scrollbars ─────────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:4px;}
+
+/* ── Header ─────────────────────────────────────────────────── */
+#header{
+  display:flex;align-items:center;gap:16px;
+  padding:0 16px;height:52px;
+  background:var(--bg-panel);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.logo{font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:.04em;color:var(--tx);}
+.logo span{color:var(--amber);}
+.tagline{font-size:10px;color:var(--tx-3);letter-spacing:.12em;text-transform:uppercase;margin-top:2px;}
+.header-sep{flex:1;}
+#global-badge{
+  display:flex;align-items:center;gap:7px;
+  padding:5px 14px;border-radius:20px;
+  font-size:11px;font-weight:600;letter-spacing:.06em;
+  transition:all .4s;
+}
+#global-badge .dot{width:7px;height:7px;border-radius:50%;}
+#clock{font-size:11px;color:var(--tx-2);letter-spacing:.08em;min-width:76px;text-align:right;}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+#main{
+  display:grid;
+  grid-template-columns:220px 1fr 292px;
+  gap:10px;padding:10px;
+  height:calc(100vh - 52px);
+}
+.panel{
+  background:var(--bg-panel);border:1px solid var(--border);
+  border-radius:var(--r-lg);overflow:hidden;display:flex;flex-direction:column;
+}
+.panel-hd{
+  padding:10px 14px 9px;border-bottom:1px solid var(--border);
+  font-family:var(--display);font-size:11px;font-weight:700;
+  letter-spacing:.10em;text-transform:uppercase;color:var(--tx-2);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.panel-body{flex:1;overflow-y:auto;padding:10px;}
+
+/* ── Left panel – cores ─────────────────────────────────────── */
+#left{display:flex;flex-direction:column;gap:0;}
+#cores-list{flex:1;overflow-y:auto;padding:8px;}
+.core-row{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 10px;border-radius:var(--r);cursor:pointer;
+  transition:background .15s;border:1px solid transparent;
+  margin-bottom:3px;
+}
+.core-row:hover{background:var(--bg-hover);}
+.core-row.selected{background:var(--bg-hover);border-color:var(--border-hi);}
+.core-id{font-size:11px;color:var(--tx-2);width:44px;flex-shrink:0;}
+.core-state-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s;}
+.core-name{flex:1;font-size:12px;color:var(--tx);}
+.core-dt{font-size:10.5px;color:var(--tx-2);text-align:right;min-width:54px;}
+.core-z{font-size:10px;min-width:40px;text-align:right;}
+
+/* ── Threat injection ───────────────────────────────────────── */
+#threat-section{padding:8px;border-top:1px solid var(--border);flex-shrink:0;}
+.threat-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);margin-bottom:7px;padding:0 2px;}
+.threat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.threat-btn{
+  padding:7px 6px;border-radius:var(--r);
+  border:1px solid var(--border);
+  background:var(--bg-card);color:var(--tx-2);
+  font-family:var(--mono);font-size:10.5px;cursor:pointer;
+  text-align:center;transition:all .15s;line-height:1.3;
+}
+.threat-btn:hover{border-color:var(--border-hi);color:var(--tx);}
+.threat-btn.active{border-color:currentColor;}
+.threat-btn[data-t="normal"].active{color:var(--green);background:var(--green-bg);}
+.threat-btn[data-t="rowhammer"].active{color:var(--red);background:var(--red-bg);}
+.threat-btn[data-t="voltage"].active{color:var(--amber);background:var(--amber-bg);}
+.threat-btn[data-t="mercurial"].active{color:var(--purple);background:var(--purple-bg);}
+.threat-btn[data-t="degradation"].active{color:var(--yellow);background:var(--yellow-bg);}
+/* headless switch */
+.sw-row{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 4px;}
+.sw-label{font-size:10.5px;color:var(--tx-2);}
+.sw-track{
+  width:34px;height:18px;border-radius:9px;
+  background:var(--border-hi);cursor:pointer;
+  position:relative;transition:background .2s;
+  border:none;padding:0;flex-shrink:0;
+}
+.sw-track[aria-checked="true"]{background:var(--green);}
+.sw-thumb{
+  position:absolute;top:2px;left:2px;
+  width:14px;height:14px;border-radius:50%;
+  background:#fff;transition:transform .2s;
+}
+.sw-track[aria-checked="true"] .sw-thumb{transform:translateX(16px);}
+
+/* ── Center panel – tabs ────────────────────────────────────── */
+#center{overflow:hidden;}
+/* Headless tabs */
+[role="tablist"]{
+  display:flex;gap:2px;padding:8px 10px 0;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+[role="tab"]{
+  padding:6px 14px;border-radius:var(--r) var(--r) 0 0;
+  border:1px solid transparent;border-bottom:none;
+  background:transparent;color:var(--tx-2);
+  font-family:var(--mono);font-size:11px;cursor:pointer;
+  transition:all .15s;letter-spacing:.04em;
+}
+[role="tab"]:hover{color:var(--tx);background:var(--bg-hover);}
+[role="tab"][aria-selected="true"]{
+  color:var(--amber);background:var(--bg-card);
+  border-color:var(--border);border-bottom-color:var(--bg-card);
+  position:relative;top:1px;
+}
+[role="tabpanel"]{flex:1;overflow-y:auto;padding:12px;}
+[role="tabpanel"][hidden]{display:none;}
+
+/* canvas waveform */
+#waveform-wrap{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);overflow:hidden;
+  margin-bottom:10px;position:relative;
+}
+#waveform-canvas{display:block;width:100%;height:180px;}
+.waveform-labels{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 10px;border-top:1px solid var(--border);
+  font-size:10px;color:var(--tx-2);
+}
+.wl-badge{padding:2px 8px;border-radius:10px;font-size:10px;}
+
+/* token card */
+#token-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 12px;
+}
+.token-title{
+  font-family:var(--display);font-size:11px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--tx-2);margin-bottom:8px;
+  display:flex;align-items:center;gap:8px;
+}
+.token-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
+.token-field{display:flex;flex-direction:column;gap:1px;}
+.tf-label{font-size:9px;color:var(--tx-3);letter-spacing:.08em;text-transform:uppercase;}
+.tf-value{font-size:11.5px;color:var(--tx);}
+
+/* state machine svg panel */
+#sm-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px;}
+#sm-svg{width:100%;display:block;}
+
+/* how-it-works */
+.hiw-section{margin-bottom:18px;}
+.hiw-hd{
+  font-family:var(--display);font-size:13px;font-weight:700;
+  color:var(--amber);margin-bottom:7px;
+  display:flex;align-items:center;gap:8px;
+}
+.hiw-hd::before{content:'';display:block;width:3px;height:14px;background:var(--amber);border-radius:2px;}
+.hiw-body{color:var(--tx-2);font-size:11.5px;line-height:1.7;}
+.hiw-body strong{color:var(--tx);}
+.hiw-body p{margin-bottom:8px;}
+.hiw-body p:last-child{margin-bottom:0;}
+.hiw-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;}
+.hiw-table th{padding:5px 8px;background:var(--bg-hover);color:var(--tx-2);text-align:left;font-weight:500;border:1px solid var(--border);}
+.hiw-table td{padding:5px 8px;border:1px solid var(--border);color:var(--tx-2);}
+.hiw-table tr:hover td{background:var(--bg-hover);}
+
+/* ── Right panel ────────────────────────────────────────────── */
+#right{gap:0;overflow:hidden;}
+/* Headless Disclosure */
+.disc-btn{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  padding:9px 14px;background:none;border:none;border-bottom:1px solid var(--border);
+  color:var(--tx-2);font-family:var(--mono);font-size:10px;
+  letter-spacing:.10em;text-transform:uppercase;cursor:pointer;
+  font-weight:700;font-family:var(--display);
+}
+.disc-btn:hover{background:var(--bg-hover);color:var(--tx);}
+.disc-arrow{transition:transform .2s;font-style:normal;}
+.disc-btn[aria-expanded="true"] .disc-arrow{transform:rotate(90deg);}
+.disc-content{overflow:hidden;transition:max-height .3s ease;max-height:0;}
+.disc-content.open{max-height:600px;}
+
+/* Alert log */
+#alert-log{flex:1;overflow-y:auto;}
+.alert-row{
+  display:flex;flex-direction:column;gap:3px;
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .12s;
+}
+.alert-row:hover{background:var(--bg-hover);}
+.alert-row-top{display:flex;align-items:center;gap:7px;}
+.alert-sev{
+  font-size:9px;font-weight:700;letter-spacing:.08em;
+  padding:2px 7px;border-radius:10px;flex-shrink:0;
+}
+.alert-msg{font-size:11.5px;color:var(--tx);flex:1;}
+.alert-time{font-size:10px;color:var(--tx-3);flex-shrink:0;}
+.alert-sub{font-size:10.5px;color:var(--tx-2);padding-left:2px;}
+
+/* Response protocol */
+.resp-body{padding:10px 12px;}
+.resp-recipient{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--border);
+}
+.resp-recipient:last-child{border-bottom:none;}
+.resp-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.resp-info{}
+.resp-who{font-size:11.5px;font-weight:600;color:var(--tx);}
+.resp-what{font-size:10.5px;color:var(--tx-2);margin-top:2px;line-height:1.5;}
+.resp-sla{
+  display:inline-block;margin-top:3px;
+  font-size:9px;padding:1px 7px;border-radius:10px;
+  background:var(--amber-bg);color:var(--amber);
+  font-weight:600;letter-spacing:.05em;
+}
+
+/* ── Stats bar ──────────────────────────────────────────────── */
+#statsbar{
+  display:flex;align-items:center;gap:0;
+  padding:0 16px;height:34px;
+  background:var(--bg-panel);border-top:1px solid var(--border);
+  font-size:10.5px;color:var(--tx-2);
+  flex-shrink:0;
+}
+.stat-item{
+  display:flex;align-items:center;gap:6px;
+  padding:0 16px;border-right:1px solid var(--border);
+}
+.stat-item:first-child{padding-left:0;}
+.stat-val{font-size:12.5px;font-weight:600;color:var(--tx);}
+
+/* ── Modal/Dialog ───────────────────────────────────────────── */
+#dialog-bg{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.7);z-index:100;
+  align-items:center;justify-content:center;
+}
+#dialog-bg.open{display:flex;}
+#dialog{
+  background:var(--bg-panel);border:1px solid var(--border-hi);
+  border-radius:var(--r-lg);width:520px;max-height:80vh;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.dlg-hd{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.dlg-title{font-family:var(--display);font-size:14px;font-weight:700;}
+.dlg-close{
+  background:none;border:1px solid var(--border);
+  color:var(--tx-2);font-size:16px;cursor:pointer;
+  border-radius:var(--r);width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;
+}
+.dlg-close:hover{background:var(--bg-hover);color:var(--tx);}
+.dlg-body{flex:1;overflow-y:auto;padding:16px 18px;}
+.dlg-section{margin-bottom:14px;}
+.dlg-section-title{
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--tx-3);margin-bottom:7px;
+}
+.dlg-kv{display:grid;grid-template-columns:140px 1fr;gap:4px;margin-bottom:6px;}
+.dk{font-size:11px;color:var(--tx-2);}
+.dv{font-size:11px;color:var(--tx);}
+.dlg-recipient{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 0;border-bottom:1px solid var(--border);
+  font-size:11.5px;
+}
+.dlg-recipient:last-child{border-bottom:none;}
+.dlg-recipient .chk{color:var(--green);}
+.action-item{
+  padding:4px 0 4px 14px;border-left:2px solid var(--border-hi);
+  font-size:11px;color:var(--tx-2);margin-bottom:4px;
+  position:relative;
+}
+.action-item::before{
+  content:'▸';position:absolute;left:-10px;
+  color:var(--amber);font-size:9px;
+}
+
+/* ── State colors (shared) ─────────────────────────────────── */
+.st-boot{color:var(--blue);}         .st-bg-boot{background:var(--blue-bg);}
+.st-healthy{color:var(--green);}      .st-bg-healthy{background:var(--green-bg);}
+.st-suspect{color:var(--amber);}      .st-bg-suspect{background:var(--amber-bg);}
+.st-degraded{color:var(--yellow);}    .st-bg-degraded{background:var(--yellow-bg);}
+.st-compromised{color:var(--red);}    .st-bg-compromised{background:var(--red-bg);}
+.st-quarantine{color:var(--purple);}  .st-bg-quarantine{background:var(--purple-bg);}
+
+/* pulse */
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.4;}}
+.pulsing{animation:pulse 1.2s ease-in-out infinite;}
+@keyframes slide-in{from{transform:translateY(-8px);opacity:0;} to{transform:translateY(0);opacity:1;}}
+.slide-in{animation:slide-in .25s ease;}
+@keyframes glow-red{0%,100%{box-shadow:0 0 0 0 rgba(240,75,75,0)} 50%{box-shadow:0 0 0 4px rgba(240,75,75,.3)}}
+.compromised-glow{animation:glow-red 1.5s ease infinite;}
+</style>
+</head>
+<body>
+<!-- ── Header ─────────────────────────────────────────────── -->
+<div id="header">
+  <div>
+    <div class="logo">H<span>A</span>KI <span style="font-size:13px;font-weight:600;color:var(--tx-2)">Monitor</span></div>
+    <div class="tagline">Hardware-Agnostic Kinetic Integrity · Live Simulation</div>
+  </div>
+  <div class="header-sep"></div>
+
+  <!-- Headless Switch: simulation on/off -->
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="font-size:10.5px;color:var(--tx-2);">Simulation</span>
+    <button id="sim-switch" role="switch" aria-checked="true" class="sw-track" aria-label="Toggle simulation">
+      <div class="sw-thumb"></div>
+    </button>
+  </div>
+
+  <!-- Speed select (native, headless-styled) -->
+  <select id="speed-select" aria-label="Simulation speed" style="
+    background:var(--bg-card);border:1px solid var(--border);
+    color:var(--tx-2);font-family:var(--mono);font-size:11px;
+    padding:5px 10px;border-radius:var(--r);cursor:pointer;">
+    <option value="2000">0.5×</option>
+    <option value="1000" selected>1×</option>
+    <option value="500">2×</option>
+    <option value="250">4×</option>
+  </select>
+
+  <div id="global-badge" style="background:var(--green-bg);border:1px solid rgba(31,199,106,.25);">
+    <div class="dot" style="background:var(--green);"></div>
+    <span id="global-state-text" style="color:var(--green);">HEALTHY</span>
+  </div>
+  <div id="clock">00:00:00</div>
+</div>
+
+<!-- ── Main Grid ─────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- LEFT: Core grid + threat injection -->
+  <div class="panel" id="left">
+    <div class="panel-hd">
+      CPU Cores
+      <span id="core-summary" style="font-size:10px;font-weight:400;color:var(--tx-3);letter-spacing:0;">8 / 8 healthy</span>
+    </div>
+    <div id="cores-list"></div>
+
+    <div id="threat-section">
+      <div class="threat-label">Inject Threat Scenario</div>
+      <div class="threat-grid">
+        <button class="threat-btn active" data-t="normal" onclick="setThreat('normal')">⬤ Normal<br/><span style="font-size:9px;color:inherit;opacity:.7">All stable</span></button>
+        <button class="threat-btn" data-t="rowhammer" onclick="setThreat('rowhammer')">⚡ Rowhammer<br/><span style="font-size:9px;color:inherit;opacity:.7">DRAM attack</span></button>
+        <button class="threat-btn" data-t="voltage" onclick="setThreat('voltage')">⚠ Volt Glitch<br/><span style="font-size:9px;color:inherit;opacity:.7">Power fault</span></button>
+        <button class="threat-btn" data-t="mercurial" onclick="setThreat('mercurial')">⊘ Merc. Core<br/><span style="font-size:9px;color:inherit;opacity:.7">Silent error</span></button>
+        <button class="threat-btn" data-t="degradation" onclick="setThreat('degradation')" style="grid-column:1/-1;">↗ Degradation · Slow hardware wear</button>
+      </div>
+      <div class="sw-row">
+        <span class="sw-label">Reset all cores</span>
+        <button onclick="resetCores()" style="
+          background:var(--bg-card);border:1px solid var(--border);
+          color:var(--tx-2);font-family:var(--mono);font-size:10.5px;
+          padding:4px 12px;border-radius:var(--r);cursor:pointer;">
+          ↺ Reset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Tabbed panel -->
+  <div class="panel" id="center" style="overflow:hidden;display:flex;flex-direction:column;">
+
+    <!-- Headless Tabs -->
+    <div role="tablist" aria-label="HAKI Monitor views">
+      <button role="tab" id="tab-wave" aria-selected="true"  aria-controls="panel-wave"  onclick="selectTab('wave')">Waveform</button>
+      <button role="tab" id="tab-sm"   aria-selected="false" aria-controls="panel-sm"    onclick="selectTab('sm')">State Machine</button>
+      <button role="tab" id="tab-tok"  aria-selected="false" aria-controls="panel-tok"   onclick="selectTab('tok')">PPoS Token</button>
+      <button role="tab" id="tab-hiw"  aria-selected="false" aria-controls="panel-hiw"   onclick="selectTab('hiw')">How It Works</button>
+    </div>
+
+    <!-- Waveform tab -->
+    <div role="tabpanel" id="panel-wave" aria-labelledby="tab-wave">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:11px;color:var(--tx-2);">Viewing Core</span>
+        <span id="selected-core-label" style="font-size:11px;color:var(--amber);font-weight:600;">Core 0</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:10px;color:var(--tx-3);">Click a core in the list to change view</span>
+      </div>
+      <div class="waveform-wrap" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:10px;">
+        <canvas id="waveform-canvas" height="170"></canvas>
+        <div class="waveform-labels">
+          <span>ΔT over last 60 probes</span>
+          <span id="wf-legend" style="display:flex;gap:12px;">
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:20px;height:2px;background:rgba(31,199,106,.4);display:inline-block;"></span>±1σ</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:20px;height:2px;background:rgba(240,75,75,.4);display:inline-block;"></span>±3σ</span>
+            <span id="wf-state-badge" class="wl-badge st-healthy st-bg-healthy">HEALTHY</span>
+          </span>
+        </div>
+      </div>
+      <!-- Live metrics row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;">
+          <div style="font-size:9px;color:var(--tx-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;">Delta-T</div>
+          <div id="stat-dt" style="font-size:16px;color:var(--tx);font-weight:600;">—</div>
+          <div style="font-size:9px;color:var(--tx-3);">cycles</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;">
+          <div style="font-size:9px;color:var(--tx-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;">Z-Score</div>
+          <div id="stat-z" style="font-size:16px;color:var(--tx);font-weight:600;">—</div>
+          <div style="font-size:9px;color:var(--tx-3);">σ deviation</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;">
+          <div style="font-size:9px;color:var(--tx-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;">INT/FP</div>
+          <div id="stat-cons" style="font-size:16px;font-weight:600;">—</div>
+          <div style="font-size:9px;color:var(--tx-3);">cross-check</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;">
+          <div style="font-size:9px;color:var(--tx-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;">Cache Miss</div>
+          <div id="stat-cm" style="font-size:16px;color:var(--tx);font-weight:600;">—</div>
+          <div style="font-size:9px;color:var(--tx-3);">rate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- State Machine tab -->
+    <div role="tabpanel" id="panel-sm" aria-labelledby="tab-sm" hidden>
+      <div id="sm-wrap" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:10px;">
+        <svg id="sm-svg" viewBox="0 0 560 230" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:12px;">
+        <div style="font-size:10px;color:var(--tx-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Transition Triggers</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+          <div style="padding:6px 8px;background:var(--bg-hover);border-radius:var(--r);border-left:2px solid var(--blue);">
+            <span style="color:var(--blue);font-weight:600;">Boot → Healthy:</span><br/>
+            <span style="color:var(--tx-2);">First passing probe cycle</span>
+          </div>
+          <div style="padding:6px 8px;background:var(--bg-hover);border-radius:var(--r);border-left:2px solid var(--amber);">
+            <span style="color:var(--amber);font-weight:600;">Healthy → Suspect:</span><br/>
+            <span style="color:var(--tx-2);">ΔT &gt; 1σ × 3 consecutive</span>
+          </div>
+          <div style="padding:6px 8px;background:var(--bg-hover);border-radius:var(--r);border-left:2px solid var(--red);">
+            <span style="color:var(--red);font-weight:600;">→ Compromised:</span><br/>
+            <span style="color:var(--tx-2);">ΔT &gt; 3σ or INT≠FP</span>
+          </div>
+          <div style="padding:6px 8px;background:var(--bg-hover);border-radius:var(--r);border-left:2px solid var(--yellow);">
+            <span style="color:var(--yellow);font-weight:600;">→ Degraded:</span><br/>
+            <span style="color:var(--tx-2);">Monotonic ΔT drift &gt; 50ns</span>
+          </div>
+          <div style="padding:6px 8px;background:var(--bg-hover);border-radius:var(--r);border-left:2px solid var(--purple);">
+            <span style="color:var(--purple);font-weight:600;">→ Quarantine:</span><br/>
+            <span style="color:var(--tx-2);">&gt; 10 compromised events</span>
+          </div>
+          <div style="padding:6px 8px;background:var(--bg-hover);border-radius:var(--r);border-left:2px solid var(--green);">
+            <span style="color:var(--green);font-weight:600;">→ Healthy (recovery):</span><br/>
+            <span style="color:var(--tx-2);">10 clean probes in Suspect</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPoS Token tab -->
+    <div role="tabpanel" id="panel-tok" aria-labelledby="tab-tok" hidden>
+      <div style="font-size:11px;color:var(--tx-2);margin-bottom:12px;">
+        A <strong style="color:var(--amber)">Physical Proof-of-State (PPoS) token</strong> is generated after every probe cycle.
+        It is a cryptographically signed attestation that the hardware was physically verified at the moment of computation.
+      </div>
+      <div id="token-display" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:14px;font-size:11.5px;">
+        <div style="font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-2);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+          Latest PPoS Token — Core <span id="tok-core">0</span>
+          <span id="tok-state-badge" style="font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.06em;">HEALTHY</span>
+        </div>
+        <div class="token-grid" id="tok-grid"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <div style="font-size:9px;color:var(--tx-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Ed25519 Signature (BLAKE3 hash of token body)</div>
+          <div id="tok-sig" style="font-size:10px;color:var(--tx-3);word-break:break-all;font-family:var(--mono);line-height:1.6;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How It Works tab -->
+    <div role="tabpanel" id="panel-hiw" aria-labelledby="tab-hiw" hidden>
+      <div class="hiw-section">
+        <div class="hiw-hd">The Problem HAKI Solves</div>
+        <div class="hiw-body">
+          <p>Modern CPU transistors are smaller than a strand of DNA. At this scale, <strong>quantum effects, electromagnetic interference, cosmic rays, and deliberate electrical attacks</strong> can cause a CPU to silently compute the wrong answer — with no error flag, no crash, no warning.</p>
+          <p>This is called <strong>Silent Data Corruption (SDC)</strong>. Meta's 2021 research found it at a rate of <strong>1 event per several thousand servers per day</strong>. At hyperscale, this means thousands of invisible errors daily. Unity Technologies lost <strong>$110 million in a single quarter</strong> from corrupted data flowing undetected through their systems.</p>
+          <p><strong>HAKI is the first software-deployable system that detects these failures in real-time, during the computation itself.</strong></p>
+        </div>
+      </div>
+      <div class="hiw-section">
+        <div class="hiw-hd">The Digital Strain Gauge</div>
+        <div class="hiw-body">
+          <p>Civil engineers attach <em>strain gauges</em> to bridges — sensors that detect microscopic physical deformation before a crack becomes a collapse. HAKI applies the same principle to silicon.</p>
+          <p>Every 10 milliseconds, HAKI fires <strong>Ghost Instructions</strong> through the CPU: a precisely crafted sequence of arithmetic operations whose physical timing signature is uniquely determined by the electrical and thermal state of the hardware. If the hardware is <em>lying</em> — whether from attack, wear, or a cosmic-ray hit — the timing changes. HAKI measures that change to sub-nanosecond precision.</p>
+        </div>
+      </div>
+      <div class="hiw-section">
+        <div class="hiw-hd">How Anomaly Detection Works</div>
+        <div class="hiw-body">
+          <p>Each probe produces three signals that are cross-checked simultaneously:</p>
+          <table class="hiw-table">
+            <tr><th>Signal</th><th>Normal</th><th>Attack / Fault</th><th>Detected As</th></tr>
+            <tr><td>ΔT (timing delta)</td><td>Within ±1σ of baseline</td><td>Spikes 4-6σ above baseline</td><td>Rowhammer / Voltage Glitch</td></tr>
+            <tr><td>INT result</td><td>== GHOST_EXPECTED_INT</td><td>Wrong value returned</td><td>Voltage Glitch / Cosmic Ray</td></tr>
+            <tr><td>FP result</td><td>≈ GHOST_EXPECTED_FP</td><td>Inconsistent with INT path</td><td>Mercurial Core</td></tr>
+          </table>
+          <p style="margin-top:8px;">A <strong>CUSUM change-point detector</strong> runs in parallel to catch <em>gradual</em> drift that does not spike above single-sample thresholds — detecting hardware wear months before failure.</p>
+        </div>
+      </div>
+      <div class="hiw-section">
+        <div class="hiw-hd">The Alert & Response Chain</div>
+        <div class="hiw-body">
+          <table class="hiw-table">
+            <tr><th>State</th><th>Trigger</th><th>Who is Notified</th><th>Automatic Action</th></tr>
+            <tr><td style="color:var(--amber);">SUSPECT</td><td>ΔT &gt; 1σ × 3 probes</td><td>SIEM, Slack</td><td>Deep probe mode (1kHz)</td></tr>
+            <tr><td style="color:var(--red);">COMPROMISED</td><td>ΔT &gt; 3σ or INT≠FP</td><td>SIEM, Slack, PagerDuty, Ops Team</td><td>In-flight computations invalidated, transactions rolled back</td></tr>
+            <tr><td style="color:var(--purple);">QUARANTINE</td><td>10+ Compromised events</td><td>All above + Security + CTO</td><td>Core physically isolated via cgroup, forensic snapshot taken</td></tr>
+          </table>
+          <p style="margin-top:8px;">Every action is recorded in a <strong>BLAKE3 cryptographic hash-chain audit log</strong> — tamper-evident and admissible as forensic evidence.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Alerts + Response -->
+  <div class="panel" id="right" style="overflow:hidden;">
+
+    <!-- Alert log — Headless Disclosure -->
+    <button class="disc-btn" aria-expanded="true" aria-controls="disc-alerts" onclick="toggleDisc(this,'disc-alerts')">
+      Alert Log <span id="alert-count-badge" style="font-size:9px;padding:1px 8px;background:var(--red-bg);color:var(--red);border-radius:10px;font-weight:700;">0</span>
+      <span class="disc-arrow">▶</span>
+    </button>
+    <div class="disc-content open" id="disc-alerts" style="flex:1;overflow-y:auto;max-height:none;">
+      <div id="alert-log">
+        <div style="padding:20px;text-align:center;color:var(--tx-3);font-size:11px;">
+          No alerts yet. System starting up…
+        </div>
+      </div>
+    </div>
+
+    <!-- Response Protocol — Headless Disclosure -->
+    <button class="disc-btn" aria-expanded="true" aria-controls="disc-resp" onclick="toggleDisc(this,'disc-resp')">
+      Response Protocol
+      <span class="disc-arrow">▶</span>
+    </button>
+    <div class="disc-content open" id="disc-resp">
+      <div class="resp-body" id="resp-body">
+        <div id="resp-current-state" style="font-size:11px;color:var(--tx-2);padding:6px 0 10px;border-bottom:1px solid var(--border);margin-bottom:10px;">
+          Current threat: <strong style="color:var(--green);">Normal operation</strong>
+        </div>
+        <!-- Recipients populated by JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div id="statsbar">
+  <div class="stat-item"><span>Total Probes</span><span class="stat-val" id="sb-probes">0</span></div>
+  <div class="stat-item"><span>Healthy Cores</span><span class="stat-val" id="sb-healthy">0</span></div>
+  <div class="stat-item"><span>Alerts Fired</span><span class="stat-val" id="sb-alerts">0</span></div>
+  <div class="stat-item"><span>Tokens Generated</span><span class="stat-val" id="sb-tokens">0</span></div>
+  <div class="stat-item"><span>Probe Rate</span><span class="stat-val" id="sb-rate">—</span></div>
+  <div class="stat-item" style="border-right:none;"><span>Uptime</span><span class="stat-val" id="sb-uptime">00:00</span></div>
+</div>
+
+<!-- Alert Detail Dialog (Headless) -->
+<div id="dialog-bg" role="presentation" onclick="closeDlg(event)">
+  <div id="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title-text">
+    <div class="dlg-hd">
+      <div class="dlg-title" id="dlg-title-text">Alert Detail</div>
+      <button class="dlg-close" onclick="closeDlgDirect()" aria-label="Close dialog">✕</button>
+    </div>
+    <div class="dlg-body" id="dlg-body"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────
+const GHOST_INT_EXPECTED = 0xCAFEBABE_DEADFACE; // simulated (actual is wrapping 64-bit mul)
+const GHOST_FP_A = 8675309.0;
+const GHOST_FP_B = Math.PI;
+const GHOST_FP_EXPECTED = GHOST_FP_A * GHOST_FP_B; // 27258273.985...
+const NUM_CORES = 8;
+const STATE_COLORS = {
+  boot:'#3b8ef5', healthy:'#1fc76a', suspect:'#f5a623',
+  degraded:'#f0c040', compromised:'#f04b4b', quarantine:'#a166f5'
+};
+const STATE_LABELS = {
+  boot:'BOOT', healthy:'HEALTHY', suspect:'SUSPECT',
+  degraded:'DEGRADED', compromised:'COMPROMISED', quarantine:'QUARANTINE'
+};
+const SEV_LABELS = {
+  boot:'INFO', healthy:'INFO', suspect:'WARN',
+  degraded:'WARN', compromised:'CRITICAL', quarantine:'FATAL'
+};
+const SEV_COLORS = {
+  boot:['var(--blue)','var(--blue-bg)'],
+  healthy:['var(--green)','var(--green-bg)'],
+  suspect:['var(--amber)','var(--amber-bg)'],
+  degraded:['var(--yellow)','var(--yellow-bg)'],
+  compromised:['var(--red)','var(--red-bg)'],
+  quarantine:['var(--purple)','var(--purple-bg)'],
+};
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+let simRunning = true;
+let selectedCore = 0;
+let currentThreat = 'normal';
+let probeCount = 0;
+let tokenCount = 0;
+let alertCount = 0;
+let startTime = Date.now();
+let simInterval = null;
+let currentSpeedMs = 1000;
+let alerts = [];
+let latestTokens = {};
+
+const cores = Array.from({length:NUM_CORES},(_,i)=>({
+  id: i,
+  state: 'boot',
+  baselineMean: 480 + Math.random()*60,
+  baselineStddev: 7 + Math.random()*6,
+  deltaT: 0,
+  zscore: 0,
+  intResult: GHOST_INT_EXPECTED,
+  fpResult: GHOST_FP_EXPECTED,
+  isConsistent: true,
+  cacheMissRate: 0.08,
+  anomalyCount: 0,
+  clearCount: 0,
+  history: [],
+  degradationDrift: 0,
+  lastToken: null,
+}));
+
+// ─────────────────────────────────────────────────────────────
+// SIMULATION LOGIC
+// ─────────────────────────────────────────────────────────────
+function generateProbe(core) {
+  const noise = () => (Math.random()-0.5)*2;
+  const t = currentThreat;
+  const s = core.baselineStddev;
+  const m = core.baselineMean;
+
+  if (t==='normal') return {
+    deltaT: m + noise()*s*0.9,
+    intResult: GHOST_INT_EXPECTED,
+    fpResult: GHOST_FP_EXPECTED,
+    consistent: true,
+    cacheMissRate: 0.07 + Math.random()*0.05,
+  };
+  if (t==='rowhammer') return {
+    deltaT: m + (3.8+Math.random()*2.2)*s,
+    intResult: GHOST_INT_EXPECTED,
+    fpResult: GHOST_FP_EXPECTED,
+    consistent: true,
+    cacheMissRate: 0.65 + Math.random()*0.25,
+  };
+  if (t==='voltage') return {
+    deltaT: m + (4.5+Math.random()*3)*s,
+    intResult: GHOST_INT_EXPECTED + 0xDEAD,
+    fpResult: GHOST_FP_EXPECTED + 9999,
+    consistent: false,
+    cacheMissRate: 0.28 + Math.random()*0.15,
+  };
+  if (t==='mercurial') return {
+    deltaT: m + noise()*s*0.5,
+    intResult: GHOST_INT_EXPECTED + 1,
+    fpResult: GHOST_FP_EXPECTED,
+    consistent: false,
+    cacheMissRate: 0.09 + Math.random()*0.04,
+  };
+  if (t==='degradation') {
+    core.degradationDrift = Math.min(core.degradationDrift + 0.4, 120);
+    return {
+      deltaT: m + core.degradationDrift + noise()*s*0.8,
+      intResult: GHOST_INT_EXPECTED,
+      fpResult: GHOST_FP_EXPECTED,
+      consistent: true,
+      cacheMissRate: 0.09 + Math.random()*0.04,
+    };
+  }
+  return {deltaT:m,intResult:GHOST_INT_EXPECTED,fpResult:GHOST_FP_EXPECTED,consistent:true,cacheMissRate:0.08};
+}
+
+function runCycle() {
+  probeCount++;
+  cores.forEach(core => {
+    const probe = generateProbe(core);
+    core.deltaT = probe.deltaT;
+    core.intResult = probe.intResult;
+    core.fpResult = probe.fpResult;
+    core.isConsistent = probe.consistent;
+    core.cacheMissRate = probe.cacheMissRate;
+    core.zscore = (probe.deltaT - core.baselineMean) / core.baselineStddev;
+
+    core.history.push(probe.deltaT);
+    if (core.history.length > 60) core.history.shift();
+
+    const prev = core.state;
+    updateStateMachine(core, probe);
+    if (core.state !== prev || core.state === 'compromised' || core.state === 'quarantine') {
+      if (core.state !== prev) fireAlert(core, prev);
+    }
+
+    tokenCount++;
+    core.lastToken = buildToken(core);
+  });
+  renderAll();
+}
+
+function updateStateMachine(core, probe) {
+  if (core.state === 'quarantine') return;
+
+  const az = Math.abs(core.zscore);
+  const bad = !probe.consistent || az > 3;
+  const mild = az > 1;
+
+  if (bad) {
+    core.clearCount = 0;
+    core.anomalyCount++;
+    if (core.state !== 'compromised') {
+      core.state = 'compromised';
+    } else if (core.anomalyCount > 12) {
+      core.state = 'quarantine';
+    }
+    return;
+  }
+
+  if (mild) {
+    core.clearCount = 0;
+    core.anomalyCount++;
+    if (core.state === 'healthy' || core.state === 'boot') {
+      if (core.anomalyCount >= 3) core.state = 'suspect';
+    }
+    return;
+  }
+
+  if (core.degradationDrift > 55 && core.state === 'healthy') {
+    core.state = 'degraded';
+    return;
+  }
+
+  // Normal probe
+  core.clearCount++;
+  core.anomalyCount = Math.max(0, core.anomalyCount - 0.5);
+  if (core.state === 'boot') { core.state = 'healthy'; return; }
+  if ((core.state==='suspect'||core.state==='degraded') && core.clearCount>=10) {
+    core.state = 'healthy';
+    core.clearCount = 0;
+    core.anomalyCount = 0;
+  }
+}
+
+function buildToken(core) {
+  const sig = Array.from({length:16},()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join('');
+  return {
+    agent_id: 'haki-demo-agent',
+    core_id: core.id,
+    sequence_number: tokenCount,
+    timestamp_ns: Date.now()*1e6,
+    delta_t_cycles: Math.round(core.deltaT),
+    timing_zscore: +core.zscore.toFixed(4),
+    cache_miss_zscore: +((core.cacheMissRate-0.08)/0.03).toFixed(3),
+    is_consistent: core.isConsistent,
+    integrity_state: core.state.toUpperCase(),
+    threat_classification: classifyThreat(core),
+    threat_confidence: getThreatConf(core),
+    signature: sig+'...'+Array.from({length:8},()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join(''),
+  };
+}
+
+function classifyThreat(core) {
+  if (!core.isConsistent && Math.abs(core.zscore)<2) return 'MercurialCore';
+  if (Math.abs(core.zscore)>3 && core.cacheMissRate>0.5) return 'RowhammerAttack';
+  if (Math.abs(core.zscore)>4 && !core.isConsistent) return 'VoltageGlitch';
+  if (!core.isConsistent) return 'ComputationInconsistency';
+  if (core.degradationDrift>50) return 'NaturalDegradation';
+  if (Math.abs(core.zscore)>1) return 'TimingAnomaly';
+  return 'None';
+}
+function getThreatConf(core) {
+  if (!core.isConsistent) return 0.92;
+  if (Math.abs(core.zscore)>4) return 0.88;
+  if (Math.abs(core.zscore)>2) return 0.72;
+  return 0.15;
+}
+
+function getRecipients(state) {
+  const r = [
+    {icon:'🗄️', who:'SIEM Platform (Splunk / Elastic)', what:'Ingests alert in CEF/ECS format. Correlation rules fire. Incident timeline starts.', sla:'< 1 sec'},
+    {icon:'📋', who:'Cryptographic Audit Log', what:'Append-only BLAKE3-chained entry written. Forensically admissible.', sla:'< 1 ms'},
+  ];
+  if (state==='suspect'||state==='degraded') r.push(
+    {icon:'💬', who:'Slack #haki-alerts', what:'Bot posts alert card with core ID, z-score, and current state. Team acknowledged.', sla:'< 2 sec'},
+  );
+  if (state==='compromised') r.push(
+    {icon:'📟', who:'PagerDuty — On-Call Engineer', what:'P2 incident created. Engineer paged. Must acknowledge and triage within SLA. Runbook link attached.', sla:'2 min SLA'},
+    {icon:'☁️', who:'Cloud Operations Team', what:'Node integrity flag updated. Traffic routing may be adjusted. Replacement capacity standby.', sla:'< 5 min'},
+    {icon:'🔍', who:'Security Monitoring', what:'Forensic snapshot encrypted and uploaded. Threat hunt query dispatched.', sla:'Automatic'},
+  );
+  if (state==='quarantine') r.push(
+    {icon:'📟', who:'PagerDuty — On-Call Engineer', what:'P1 Severity-1 incident. Wake-up page. 2-minute response SLA.', sla:'2 min SLA'},
+    {icon:'🔐', who:'Security Incident Response', what:'Formal IR ticket opened. Chain-of-custody for forensic snapshot. Regulatory notification assessment.', sla:'15 min'},
+    {icon:'📊', who:'CTO Escalation', what:'Executive brief generated. Business impact assessment started. DR plan evaluated.', sla:'30 min'},
+  );
+  return r;
+}
+
+function getAutoActions(state) {
+  if (state==='suspect') return [
+    'Probe frequency increased 10× (100Hz → 1kHz) on affected core',
+    'CUSUM change-point detector put in heightened sensitivity mode',
+    'Alert entry written to cryptographic audit log',
+  ];
+  if (state==='degraded') return [
+    'Predictive maintenance alert raised — plan hardware replacement',
+    'PPoS tokens marked DEGRADED (computation allowed but flagged)',
+    'CUSUM degradation trend recorded for trend analysis',
+  ];
+  if (state==='compromised') return [
+    'ALL in-flight computations on this core IMMEDIATELY INVALIDATED',
+    'Active database transactions involving this core ROLLED BACK',
+    'Core removed from load balancer / computation routing pool',
+    'Ed25519-signed forensic snapshot captured (gzip + AES-256-GCM)',
+    'Kubernetes node annotation updated: haki.io/integrity-state=Compromised',
+  ];
+  if (state==='quarantine') return [
+    'Core PHYSICALLY ISOLATED via Linux cgroup cpuset — cannot execute code',
+    'All application callbacks notified: do not route to this core',
+    'Full forensic bundle uploaded to secure S3 bucket (encrypted)',
+    'Kubernetes node tainted: NoSchedule — no new pods placed on this node',
+    'Replacement compute capacity provisioned in parallel AZ',
+    'Incident ticket auto-created with full telemetry, PPoS chain, audit log',
+  ];
+  return ['Routine log entry — no action required'];
+}
+
+let alertIdSeq = 0;
+function fireAlert(core, prevState) {
+  const state = core.state;
+  if (state==='boot'||state==='healthy') return;
+  alertIdSeq++;
+  alertCount++;
+  const sev = SEV_LABELS[state]||'INFO';
+  const msg = {
+    suspect:`Core ${core.id} entered SUSPECT state (ΔT z=${core.zscore.toFixed(2)}σ)`,
+    degraded:`Core ${core.id} showing hardware degradation (drift: ${core.degradationDrift.toFixed(0)}ns)`,
+    compromised:`⚠ Core ${core.id} COMPROMISED — ${core.isConsistent?'Timing spike':'INT≠FP mismatch'}`,
+    quarantine:`🚨 Core ${core.id} QUARANTINED — isolated from all computation`,
+  }[state]||`Core ${core.id} changed state`;
+  const alert = {
+    id: alertIdSeq,
+    coreId: core.id,
+    state,
+    prevState,
+    severity: sev,
+    message: msg,
+    time: new Date(),
+    zscore: core.zscore,
+    deltaT: core.deltaT,
+    cacheMissRate: core.cacheMissRate,
+    isConsistent: core.isConsistent,
+    threat: classifyThreat(core),
+    confidence: getThreatConf(core),
+    recipients: getRecipients(state),
+    autoActions: getAutoActions(state),
+  };
+  alerts.unshift(alert);
+  if (alerts.length>40) alerts.pop();
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDERING
+// ─────────────────────────────────────────────────────────────
+function renderAll() {
+  renderCoreList();
+  renderWaveform();
+  renderStatBadge();
+  renderToken();
+  renderStateMachine();
+  renderAlertLog();
+  renderResponsePanel();
+  renderStatsBar();
+  renderGlobalBadge();
+}
+
+function renderCoreList() {
+  const el = document.getElementById('cores-list');
+  let html = '';
+  cores.forEach(c=>{
+    const col = STATE_COLORS[c.state];
+    const lbl = STATE_LABELS[c.state];
+    const zCol = Math.abs(c.zscore)>3?'var(--red)':Math.abs(c.zscore)>1?'var(--amber)':'var(--tx-3)';
+    html+=`<div class="core-row${c.id===selectedCore?' selected':''}"
+      onclick="selectCore(${c.id})" role="button" tabindex="0" aria-label="Core ${c.id}: ${lbl}">
+      <span class="core-id">Core ${c.id}</span>
+      <span class="core-state-dot${c.state==='compromised'?' pulsing':''}" style="background:${col}"></span>
+      <span class="core-name" style="color:${col};font-size:11px;">${lbl}</span>
+      <span class="core-dt">${Math.round(c.deltaT)}ns</span>
+      <span class="core-z" style="color:${zCol}">${c.zscore>0?'+':''}${c.zscore.toFixed(1)}σ</span>
+    </div>`;
+  });
+  const healthy = cores.filter(c=>c.state==='healthy').length;
+  el.innerHTML=html;
+  document.getElementById('core-summary').textContent=`${healthy} / ${NUM_CORES} healthy`;
+}
+
+const canvas = document.getElementById('waveform-canvas');
+const ctx = canvas.getContext('2d');
+function renderWaveform() {
+  const core = cores[selectedCore];
+  const W = canvas.offsetWidth||600;
+  const H = 170;
+  canvas.width = W; canvas.height = H;
+
+  const bg='#11131f';
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  if (!core.history.length) return;
+  const vals = core.history;
+  const mean = core.baselineMean;
+  const sd   = core.baselineStddev;
+  const minV = mean - sd*5;
+  const maxV = mean + sd*5;
+  const toY = v=>H - ((v-minV)/(maxV-minV))*H;
+
+  // σ bands
+  const y1lo=toY(mean-sd), y1hi=toY(mean+sd);
+  const y3lo=toY(mean-sd*3), y3hi=toY(mean+sd*3);
+  ctx.fillStyle='rgba(240,75,75,.06)';
+  ctx.fillRect(0,y3hi,W,y3lo-y3hi);
+  ctx.fillStyle='rgba(31,199,106,.06)';
+  ctx.fillRect(0,y1hi,W,y1lo-y1hi);
+
+  // Grid lines
+  ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+  for(let i=0;i<5;i++){
+    const y=H/4*i;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // Baseline
+  ctx.strokeStyle='rgba(31,199,106,.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,toY(mean)); ctx.lineTo(W,toY(mean)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // σ lines
+  [[sd,`rgba(245,166,35,.3)`],[sd*3,`rgba(240,75,75,.4)`]].forEach(([s,c])=>{
+    ctx.strokeStyle=c; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(0,toY(mean+s)); ctx.lineTo(W,toY(mean+s)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,toY(mean-s)); ctx.lineTo(W,toY(mean-s)); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // ΔT line
+  const step = W / (Math.max(vals.length-1,1));
+  const stateCol = STATE_COLORS[core.state];
+  ctx.strokeStyle = stateCol; ctx.lineWidth=2;
+  ctx.shadowColor=stateCol; ctx.shadowBlur=4;
+  ctx.beginPath();
+  vals.forEach((v,i)=>{ const x=i*step, y=toY(v); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.shadowBlur=0;
+
+  // Latest point
+  if (vals.length>0) {
+    const lx=(vals.length-1)*step, ly=toY(vals[vals.length-1]);
+    ctx.fillStyle=stateCol;
+    ctx.beginPath(); ctx.arc(lx,ly,4,0,Math.PI*2); ctx.fill();
+  }
+
+  // Labels
+  ctx.font='10px JetBrains Mono'; ctx.fillStyle='rgba(125,132,166,.7)'; ctx.textAlign='right';
+  ctx.fillText(`+3σ ${Math.round(mean+sd*3)}`,W-4,toY(mean+sd*3)-3);
+  ctx.fillText(`+1σ ${Math.round(mean+sd)}`,W-4,toY(mean+sd)-3);
+  ctx.fillText(`mean ${Math.round(mean)}`,W-4,toY(mean)-3);
+  ctx.textAlign='left';
+
+  // Waveform badge
+  document.getElementById('wf-state-badge').textContent=STATE_LABELS[core.state];
+  document.getElementById('wf-state-badge').className=`wl-badge st-${core.state} st-bg-${core.state}`;
+
+  document.getElementById('stat-dt').textContent=Math.round(core.deltaT);
+  const zc=Math.abs(core.zscore)>3?'var(--red)':Math.abs(core.zscore)>1?'var(--amber)':'var(--green)';
+  document.getElementById('stat-z').style.color=zc;
+  document.getElementById('stat-z').textContent=(core.zscore>0?'+':'')+core.zscore.toFixed(2);
+  const consEl=document.getElementById('stat-cons');
+  consEl.textContent=core.isConsistent?'PASS':'FAIL';
+  consEl.style.color=core.isConsistent?'var(--green)':'var(--red)';
+  document.getElementById('stat-cm').textContent=(core.cacheMissRate*100).toFixed(1)+'%';
+  document.getElementById('selected-core-label').textContent=`Core ${selectedCore}`;
+}
+
+function renderStatBadge() {}
+
+function renderToken() {
+  const core = cores[selectedCore];
+  const tok = core.lastToken;
+  if (!tok) return;
+  document.getElementById('tok-core').textContent=core.id;
+  const sb=document.getElementById('tok-state-badge');
+  sb.textContent=STATE_LABELS[core.state];
+  sb.className=`st-${core.state} st-bg-${core.state}`;
+  sb.style.cssText+=';padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:.06em;';
+
+  const grid=document.getElementById('tok-grid');
+  const fields=[
+    ['agent_id',tok.agent_id],['core_id',`Core ${tok.core_id}`],
+    ['sequence_number',tok.sequence_number.toLocaleString()],
+    ['timestamp_ns',new Date(tok.timestamp_ns/1e6).toISOString().split('.')[0]+'Z'],
+    ['delta_t_cycles',tok.delta_t_cycles+' cycles'],
+    ['timing_zscore',(tok.timing_zscore>0?'+':'')+tok.timing_zscore+'σ'],
+    ['is_consistent',tok.is_consistent?'✅ true':'❌ false'],
+    ['threat',tok.threat_classification],
+    ['confidence',(tok.threat_confidence*100).toFixed(0)+'%'],
+    ['integrity_state',tok.integrity_state],
+  ];
+  grid.innerHTML=fields.map(([k,v])=>`
+    <div class="token-field">
+      <div class="tf-label">${k}</div>
+      <div class="tf-value" style="color:${k==='is_consistent'&&!tok.is_consistent?'var(--red)':k==='integrity_state'?STATE_COLORS[core.state]:'var(--tx)'}">${v}</div>
+    </div>`).join('');
+  document.getElementById('tok-sig').textContent=tok.signature;
+}
+
+function renderStateMachine() {
+  const svg=document.getElementById('sm-svg');
+  const states=[
+    {id:'boot',     label:'BOOT',        x:45,  y:50,  r:30},
+    {id:'healthy',  label:'HEALTHY',     x:145, y:50,  r:30},
+    {id:'suspect',  label:'SUSPECT',     x:245, y:50,  r:30},
+    {id:'compromised',label:'COMPR.',    x:345, y:50,  r:30},
+    {id:'quarantine',label:'QUARANTINE', x:460, y:50,  r:38},
+    {id:'degraded', label:'DEGRADED',   x:245, y:165, r:30},
+  ];
+  const arrows=[
+    {from:'boot',to:'healthy'},{from:'healthy',to:'suspect'},
+    {from:'suspect',to:'compromised'},{from:'compromised',to:'quarantine'},
+    {from:'healthy',to:'degraded'},{from:'suspect',to:'healthy'},
+    {from:'degraded',to:'healthy'},
+  ];
+  const activeCoreState = cores[selectedCore].state;
+
+  // Build arrow paths
+  function getNodeById(id){return states.find(s=>s.id===id);}
+  const arrowPaths=arrows.map(a=>{
+    const f=getNodeById(a.from), t=getNodeById(a.to);
+    if(!f||!t) return '';
+    const dx=t.x-f.x, dy=t.y-f.y, len=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/len, uy=dy/len;
+    const sx=f.x+ux*f.r, sy=f.y+uy*f.r;
+    const ex=t.x-ux*(t.r+6), ey=t.y-uy*(t.r+6);
+    const isActive = (f.id===activeCoreState||t.id===activeCoreState) && activeCoreState!=='boot';
+    const col=isActive?STATE_COLORS[activeCoreState]:'rgba(45,50,80,1)';
+    return `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${col}" stroke-width="${isActive?2:1}" marker-end="url(#ah${isActive?'a':'n'})"/>`;
+  }).join('');
+
+  svg.innerHTML=`
+    <defs>
+      <marker id="ahn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0,8 3,0 6" fill="rgba(45,50,80,1)"/>
+      </marker>
+      <marker id="aha" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0,8 3,0 6" fill="${STATE_COLORS[activeCoreState]||'#fff'}"/>
+      </marker>
+    </defs>
+    ${arrowPaths}
+    ${states.map(s=>{
+      const active=s.id===activeCoreState;
+      const col=STATE_COLORS[s.id];
+      return `
+      <g>
+        ${active?`<circle cx="${s.x}" cy="${s.y}" r="${s.r+8}" fill="${col}" opacity=".12"/>
+                  <circle cx="${s.x}" cy="${s.y}" r="${s.r+4}" fill="${col}" opacity=".08"/>`:'' }
+        <circle cx="${s.x}" cy="${s.y}" r="${s.r}"
+          fill="${active?col:'#13162a'}"
+          stroke="${col}" stroke-width="${active?2.5:1.5}"
+          opacity="${active?1:0.5}"/>
+        <text x="${s.x}" y="${s.y}" text-anchor="middle" dominant-baseline="middle"
+          font-family="Syne" font-size="${s.r<35?9:8}" font-weight="700"
+          fill="${active?'#fff':col}" opacity="${active?1:0.7}">
+          ${s.label}
+        </text>
+      </g>`;
+    }).join('')}`;
+}
+
+function renderAlertLog() {
+  const el=document.getElementById('alert-log');
+  if (!alerts.length) {
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--tx-3);font-size:11px;">No alerts yet.</div>';
+    return;
+  }
+  const [c1,c2]=[[...new Set(alerts.map(a=>a.severity))]];
+  el.innerHTML=alerts.slice(0,20).map(a=>{
+    const [tc,bg]=SEV_COLORS[a.state]||['var(--tx-2)','var(--bg-card)'];
+    const t=a.time.toLocaleTimeString('en',{hour12:false});
+    return `<div class="alert-row slide-in" onclick="openAlertDlg(${a.id})" role="button" tabindex="0"
+      aria-label="${a.severity}: ${a.message}">
+      <div class="alert-row-top">
+        <span class="alert-sev" style="color:${tc};background:${bg}">${a.severity}</span>
+        <span class="alert-msg">${a.message}</span>
+        <span class="alert-time">${t}</span>
+      </div>
+      <div class="alert-sub">Core ${a.coreId} · Threat: ${a.threat} · z=${a.zscore.toFixed(2)}σ</div>
+    </div>`;
+  }).join('');
+  document.getElementById('alert-count-badge').textContent=alertCount;
+}
+
+function renderResponsePanel() {
+  const el=document.getElementById('resp-body');
+  const worstState=cores.reduce((w,c)=>{
+    const order=['boot','healthy','degraded','suspect','compromised','quarantine'];
+    return order.indexOf(c.state)>order.indexOf(w)?c.state:w;
+  },'healthy');
+  const col=STATE_COLORS[worstState];
+  const recs=getRecipients(worstState);
+  const acts=getAutoActions(worstState);
+  el.innerHTML=`
+    <div id="resp-current-state" style="font-size:11px;color:var(--tx-2);padding:6px 0 10px;border-bottom:1px solid var(--border);margin-bottom:10px;">
+      System threat level: <strong style="color:${col};">${STATE_LABELS[worstState]}</strong>
+    </div>
+    <div style="font-size:9px;color:var(--tx-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;">Alert Recipients</div>
+    ${recs.map(r=>`
+      <div class="resp-recipient">
+        <div class="resp-icon">${r.icon}</div>
+        <div class="resp-info">
+          <div class="resp-who">${r.who}</div>
+          <div class="resp-what">${r.what}</div>
+          <span class="resp-sla">SLA: ${r.sla}</span>
+        </div>
+      </div>`).join('')}
+    ${acts.length?`
+    <div style="font-size:9px;color:var(--tx-3);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px;">Automatic Actions</div>
+    ${acts.map(a=>`<div class="action-item">${a}</div>`).join('')}`:''}`;
+}
+
+function renderStatsBar() {
+  document.getElementById('sb-probes').textContent=probeCount.toLocaleString();
+  document.getElementById('sb-healthy').textContent=cores.filter(c=>c.state==='healthy').length;
+  document.getElementById('sb-alerts').textContent=alertCount;
+  document.getElementById('sb-tokens').textContent=tokenCount.toLocaleString();
+  document.getElementById('sb-rate').textContent=`${(1000/currentSpeedMs).toFixed(1)} Hz`;
+  const sec=Math.floor((Date.now()-startTime)/1000);
+  document.getElementById('sb-uptime').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+}
+
+function renderGlobalBadge() {
+  const hasCom=cores.some(c=>c.state==='compromised'||c.state==='quarantine');
+  const hasSus=cores.some(c=>c.state==='suspect'||c.state==='degraded');
+  const badge=document.getElementById('global-badge');
+  const txt=document.getElementById('global-state-text');
+  if (hasCom) {
+    badge.style.cssText='display:flex;align-items:center;gap:7px;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.06em;transition:all .4s;background:var(--red-bg);border:1px solid rgba(240,75,75,.35)';
+    txt.style.color='var(--red)'; txt.textContent='COMPROMISED';
+    badge.querySelector('.dot').style.background='var(--red)';
+  } else if (hasSus) {
+    badge.style.cssText='display:flex;align-items:center;gap:7px;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.06em;transition:all .4s;background:var(--amber-bg);border:1px solid rgba(245,166,35,.35)';
+    txt.style.color='var(--amber)'; txt.textContent='SUSPECT';
+    badge.querySelector('.dot').style.background='var(--amber)';
+  } else {
+    badge.style.cssText='display:flex;align-items:center;gap:7px;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.06em;transition:all .4s;background:var(--green-bg);border:1px solid rgba(31,199,106,.25)';
+    txt.style.color='var(--green)'; txt.textContent='HEALTHY';
+    badge.querySelector('.dot').style.background='var(--green)';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// UI INTERACTIONS
+// ─────────────────────────────────────────────────────────────
+function selectTab(id) {
+  ['wave','sm','tok','hiw'].forEach(t=>{
+    document.getElementById(`tab-${t}`).setAttribute('aria-selected',t===id?'true':'false');
+    const p=document.getElementById(`panel-${t}`);
+    if(t===id) p.removeAttribute('hidden'); else p.setAttribute('hidden','');
+  });
+}
+function selectCore(id) { selectedCore=id; renderAll(); }
+function setThreat(t) {
+  currentThreat=t;
+  document.querySelectorAll('.threat-btn').forEach(b=>{
+    b.classList.toggle('active',b.dataset.t===t);
+  });
+  // Reset cores for clean demo
+  if(t!=='degradation') cores.forEach(c=>{ c.degradationDrift=0; });
+}
+function resetCores() {
+  cores.forEach(c=>{
+    c.state='boot'; c.anomalyCount=0; c.clearCount=0;
+    c.history=[]; c.degradationDrift=0;
+  });
+  alerts=[];alertCount=0;probeCount=0;tokenCount=0;
+  setThreat('normal');
+  renderAll();
+}
+function toggleDisc(btn,contentId) {
+  const expanded=btn.getAttribute('aria-expanded')==='true';
+  btn.setAttribute('aria-expanded',!expanded);
+  const content=document.getElementById(contentId);
+  content.classList.toggle('open',!expanded);
+}
+
+// Headless Switch
+document.getElementById('sim-switch').addEventListener('click',function(){
+  const on=this.getAttribute('aria-checked')==='true';
+  this.setAttribute('aria-checked',String(!on));
+  simRunning=!on;
+  if(simRunning) startSim(); else clearInterval(simInterval);
+});
+document.getElementById('speed-select').addEventListener('change',function(){
+  currentSpeedMs=+this.value;
+  if(simRunning){ clearInterval(simInterval); startSim(); }
+});
+
+// Clock
+setInterval(()=>{
+  const now=new Date();
+  document.getElementById('clock').textContent=now.toLocaleTimeString('en-GB',{hour12:false});
+},1000);
+
+// Dialog
+function openAlertDlg(id) {
+  const a=alerts.find(x=>x.id===id); if(!a) return;
+  const [tc]=SEV_COLORS[a.state]||['var(--tx-2)'];
+  const body=document.getElementById('dlg-body');
+  body.innerHTML=`
+    <div class="dlg-section">
+      <div class="dlg-section-title">Event Details</div>
+      <div class="dlg-kv"><span class="dk">Severity</span><span class="dv" style="color:${tc};font-weight:600;">${a.severity}</span></div>
+      <div class="dlg-kv"><span class="dk">Core ID</span><span class="dv">Core ${a.coreId}</span></div>
+      <div class="dlg-kv"><span class="dk">State Transition</span><span class="dv">${STATE_LABELS[a.prevState]} → ${STATE_LABELS[a.state]}</span></div>
+      <div class="dlg-kv"><span class="dk">Threat Class</span><span class="dv">${a.threat}</span></div>
+      <div class="dlg-kv"><span class="dk">Confidence</span><span class="dv">${(a.confidence*100).toFixed(0)}%</span></div>
+      <div class="dlg-kv"><span class="dk">Delta-T</span><span class="dv">${Math.round(a.deltaT)} cycles</span></div>
+      <div class="dlg-kv"><span class="dk">Z-Score</span><span class="dv" style="color:${Math.abs(a.zscore)>3?'var(--red)':'var(--amber)'}">${a.zscore.toFixed(4)}σ</span></div>
+      <div class="dlg-kv"><span class="dk">INT/FP Consistent</span><span class="dv" style="color:${a.isConsistent?'var(--green)':'var(--red)'}">${a.isConsistent?'✅ Pass':'❌ FAIL'}</span></div>
+      <div class="dlg-kv"><span class="dk">Timestamp</span><span class="dv">${a.time.toISOString()}</span></div>
+    </div>
+    <div class="dlg-section">
+      <div class="dlg-section-title">Alert Recipients (${a.recipients.length})</div>
+      ${a.recipients.map(r=>`<div class="dlg-recipient"><span class="chk">✓</span><span>${r.icon} ${r.who}</span><span style="flex:1;"></span><span style="font-size:10px;color:var(--amber);">${r.sla}</span></div>`).join('')}
+    </div>
+    <div class="dlg-section">
+      <div class="dlg-section-title">Automatic Actions Taken</div>
+      ${a.autoActions.map(ac=>`<div class="action-item">${ac}</div>`).join('')}
+    </div>`;
+  document.getElementById('dlg-title-text').textContent=a.message;
+  document.getElementById('dialog-bg').classList.add('open');
+  document.getElementById('dialog').focus();
+}
+function closeDlg(e){ if(e.target===document.getElementById('dialog-bg')) closeDlgDirect(); }
+function closeDlgDirect(){ document.getElementById('dialog-bg').classList.remove('open'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDlgDirect(); });
+
+// ─────────────────────────────────────────────────────────────
+// SIMULATION LOOP
+// ─────────────────────────────────────────────────────────────
+function startSim() {
+  simInterval=setInterval(()=>{ if(simRunning) runCycle(); }, currentSpeedMs);
+}
+// Init: a few boot cycles
+setTimeout(()=>{ cores.forEach(c=>c.state='healthy'); renderAll(); },200);
+startSim();
+</script>
+</body>
+</html>
