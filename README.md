@@ -2,7 +2,7 @@
 Live Simulation: https://cjay254.github.io/HAKI-architecture-simulator/
 HAKI (Hardware-Agnostic Kinetic Integrity) is a software safety net protecting data centers from Silent Data Corruption. As chips degrade, they make hidden errors. HAKI uses a mathematical framework to verify calculation integrity in real-time with low overhead. This repo holds the architectural blueprints and behavioral simulation.
 
-This is an interactive proof-of-concept simulator demonstrating real-time Physical Proof-of-State (PPoS) detection across 7 CPU cores, with live threat injection, anomaly scoring, and an automated alert chain.
+This is an interactive proof-of-concept simulator demonstrating real-time Physical Proof-of-State (PPoS) detection across 8 CPU cores, with live threat injection, anomaly scoring, and an automated alert chain.
 
 ## Why HAKI Exists
 
@@ -26,7 +26,7 @@ HAKI fills that gap. Inspired by the strain gauge used in civil engineering — 
 This simulator is a fully functional browser-based demonstration of the HAKI protocol. No installation required — open `index.html` in any browser.
 
 ### Explore the core protocol
-- Watch 7 CPU cores continuously emit Ghost Probe results in real time
+- Watch 8 CPU cores continuously emit Ghost Probe results in real time
 - See `ΔT` (timing delta), z-score, and INT/FP consistency values update per probe cycle
 - Observe the '5-state Integrity Finite State Machine' transition in the State Machine tab: `BOOT → HEALTHY → SUSPECT → DEGRADED → COMPROMISED → QUARANTINE`
 
